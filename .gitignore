@@ -1,0 +1,13 @@
+.venv
+data
+.ipynb_checkpoints
+events.csv
+EDA_eventSim.ipynb
+tmp
+spark_test_1_parquet_file.ipynb
+test_notebooks
+spark_test_parquet_file.ipynb
+dashboard.txt
+source.txt
+checkpoints
+keys

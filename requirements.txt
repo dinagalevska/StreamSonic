@@ -1,0 +1,6 @@
+kafka-python==1.4.6
+dbt-bigquery==1.0.0
+pyarrow
+pandas
+sqlalchemy
+psycopg2-binary
