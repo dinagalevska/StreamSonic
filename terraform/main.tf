@@ -15,6 +15,26 @@ provider "google" {
   zone        = var.zone
 }
 
+resource "google_compute_address" "kafka_static_ip" {
+  name   = "kafka-static-ip"
+  region = var.region
+}
+
+resource "google_compute_address" "airflow_static_ip" {
+  name   = "airflow-static-ip"
+  region = var.region
+}
+
+output "kafka_vm_static_ip" {
+  value       = google_compute_address.kafka_static_ip.address
+  description = "Static external IP of the Kafka VM instance"
+}
+
+output "airflow_vm_static_ip" {
+  value       = google_compute_address.airflow_static_ip.address
+  description = "Static external IP of the Airflow VM instance"
+}
+
 resource "google_compute_firewall" "port_rules" {
   project     = var.project_id
   name        = "kafka-broker-port"
@@ -44,7 +64,9 @@ resource "google_compute_instance" "kafka_vm_instance" {
 
   network_interface {
     network = "default"
-    access_config {}
+    access_config {
+      nat_ip = google_compute_address.kafka_static_ip.address
+    }
   }
 }
 
@@ -61,7 +83,9 @@ resource "google_compute_instance" "airflow_vm_instance" {
 
   network_interface {
     network = "default"
-    access_config {}
+    access_config {
+      nat_ip = google_compute_address.airflow_static_ip.address
+    }
   }
 
   lifecycle {
