@@ -1,5 +1,5 @@
 .venv
-data
+/data
 .ipynb_checkpoints
 events.csv
 EDA_eventSim.ipynb
@@ -11,3 +11,4 @@ dashboard.txt
 source.txt
 checkpoints
 keys
+tf_with_airflow.txt

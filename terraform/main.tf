@@ -20,20 +20,14 @@ resource "google_compute_address" "kafka_static_ip" {
   region = var.region
 }
 
-resource "google_compute_address" "airflow_static_ip" {
-  name   = "airflow-static-ip"
-  region = var.region
-}
+
 
 output "kafka_vm_static_ip" {
   value       = google_compute_address.kafka_static_ip.address
   description = "Static external IP of the Kafka VM instance"
 }
 
-output "airflow_vm_static_ip" {
-  value       = google_compute_address.airflow_static_ip.address
-  description = "Static external IP of the Airflow VM instance"
-}
+
 
 resource "google_compute_firewall" "port_rules" {
   project     = var.project_id
@@ -70,39 +64,6 @@ resource "google_compute_instance" "kafka_vm_instance" {
   }
 }
 
-resource "google_compute_instance" "airflow_vm_instance" {
-  name                      = "Musicdata-Streaming-Pipeline-airflow-instance"
-  machine_type              = "e2-standard-2"
-  allow_stopping_for_update = true
-
-  boot_disk {
-    initialize_params {
-      image = "ubuntu-os-cloud/ubuntu-2204-jammy-v20240904"
-    }
-  }
-
-  network_interface {
-    network = "default"
-    access_config {
-      nat_ip = google_compute_address.airflow_static_ip.address
-    }
-  }
-
-  lifecycle {
-    ignore_changes = [metadata["ssh-keys"]]
-  }
-
-  service_account {
-    email  = var.service_account_email
-    scopes = ["cloud-platform"]
-  }
-}
-
-output "airflow_vm_external_ip" {
-  value       = google_compute_instance.airflow_vm_instance.network_interface[0].access_config[0].nat_ip
-  description = "External IP address of the Airflow VM instance"
-}
-
 resource "google_storage_bucket" "streamsonic_bucket" {
   name          = var.bucket_name
   location      = var.region
@@ -120,6 +81,7 @@ resource "google_storage_bucket" "streamsonic_bucket" {
     }
   }
 }
+
 
 output "bucket_name" {
   value       = google_storage_bucket.streamsonic_bucket.name
