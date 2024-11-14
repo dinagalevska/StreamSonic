@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd ~/StreamSonic/eventsim
+cd ~/StreamSonic/eventsim_docker
 
 echo "Building Eventsim Image..."
 docker build -t streamsonic .
