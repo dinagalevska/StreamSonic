@@ -136,10 +136,3 @@ output "dataproc_cluster_master_type" {
   value       = google_dataproc_cluster.mulitnode_spark_cluster.cluster_config[0].master_config[0].machine_type
   description = "Machine type of the Dataproc cluster master node"
 }
-
-resource "google_bigquery_dataset" "streamsonic_dataset" {
-  dataset_id = var.dataset_id
-  project    = var.project_id
-  location   = var.region
-}
-

@@ -27,9 +27,3 @@ variable "bucket_name" {
   default     = "streamsonic_bucket"
   description = "Name of the Google Cloud Storage bucket for data storage"
 }
-
-variable "dataset_id" {
-  default     = "streamsonic_dataset"
-  description = "BigQuery dataset ID for storing processed data"
-}
-
