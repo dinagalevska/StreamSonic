@@ -1,7 +1,8 @@
 #!/bin/bash
 
-#Send messages to Kafka Topic from eventsim
-docker run -itd \
+# Send messages to Kafka Topic from eventsim
+# Timeout set to 10 minutes (600 seconds)
+timeout 600s docker run -itd \
   --network host \
   --name events_example \
   --memory="5.5g" \
@@ -16,9 +17,9 @@ docker run -itd \
     --userid 1 \
     --kafkaBrokerList localhost:9092 \
     --randomseed 1 \
-    --continuous
+    # --continuous
 
-docker run -itd \
+timeout 600s docker run -itd \
   --network host \
   --name events_alt \
   --memory="5.5g" \
@@ -33,9 +34,9 @@ docker run -itd \
     --userid 3000000 \
     --kafkaBrokerList localhost:9092 \
     --randomseed 2 \
-    --continuous
+    # --continuous
 
-docker run -itd \
+timeout 600s docker run -itd \
   --network host \
   --name events_new \
   --memory="2.5g" \
@@ -50,11 +51,10 @@ docker run -itd \
     --userid 6000000 \
     --kafkaBrokerList localhost:9092 \
     --randomseed 3 \
-    --continuous
+    # --continuous
 
-
+# Attach logs if necessary
 docker logs --follow events_example
-
 docker logs --follow events_alt
 
 
@@ -79,7 +79,8 @@ stream_all_events.py \
 
 
 
-docker run -it \
+# Running another Eventsim container (one-off) with timeout
+timeout 600s docker run -it \
   --network host \
   streamsonic \
     -c "examples/example-config.json" \
@@ -90,4 +91,4 @@ docker run -it \
     --userid 1 \
     --kafkaBrokerList localhost:9092 \
     --randomseed 1 \
-    --continuous
+    # --continuous

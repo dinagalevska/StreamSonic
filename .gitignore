@@ -12,3 +12,4 @@ source.txt
 checkpoints
 keys
 tf_with_airflow.txt
+dim_fact_tables_locally
