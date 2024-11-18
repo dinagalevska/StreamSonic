@@ -1,3 +1,8 @@
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
+
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, lead, lag, lit, when, rank, sum as _sum, first
 from pyspark.sql.window import Window
@@ -24,6 +29,11 @@ spark = SparkSession.builder \
     .master("local[*]") \
     .getOrCreate()
 
+checkpoint_dir = "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/checkpoints/user_dim/"
+
+spark.sparkContext.setCheckpointDir(checkpoint_dir)
+
+
 listen_events_df = spark.read.option("mergeSchema", "true").schema(schema['listen_events']).parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp/raw_listen_events")
 
 user_base_df = listen_events_df.select(
@@ -34,7 +44,7 @@ user_base_df = listen_events_df.select(
     col("level"),
     (col("ts") / 1000).cast("timestamp").alias("eventTimestamp"),
     col("registration").cast("bigint")
-).distinct()
+)
 
 window_spec = Window.partitionBy("userId").orderBy("eventTimestamp")
 
@@ -76,7 +86,11 @@ final_user_dim_df = activation_df.withColumn(
     when(col("rowExpirationDate") == lit(datetime(9999, 12, 31)), lit(1)).otherwise(lit(0))
 )
 
+final_user_dim_df = final_user_dim_df.filter(col("currRow") == 1)
+
+final_user_dim_df.checkpoint()
+
 output_path = "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/user_dimension"
 final_user_dim_df.write.mode("append").parquet(output_path)
 
-spark.read.parquet(output_path).show()
+# spark.read.parquet(output_path).show()
