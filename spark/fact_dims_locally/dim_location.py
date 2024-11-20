@@ -4,9 +4,14 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, lit, coalesce, sha2, concat_ws, hash
+from pyspark.sql.functions import col, lit, coalesce, sha2, concat_ws, hash, sum, lag, lead, when, first, current_timestamp
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, LongType
 from data_schemas import schema
+from pyspark.sql.window import Window
+from datetime import datetime
+
+def table_exists(path: str) -> bool:
+    return os.path.exists(path)
 
 spark = SparkSession.builder \
     .appName("Dim Location") \
@@ -17,16 +22,7 @@ checkpoint_dir = "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_ta
 
 spark.sparkContext.setCheckpointDir(checkpoint_dir)
 
-location_dim_schema = StructType(
-    [
-        StructField("locationId", LongType(), True),
-        StructField("city", StringType(), True),
-        StructField("zip", StringType(), True),
-        StructField("state", StringType(), True),
-        StructField("lon", DoubleType(), True),
-        StructField("lat", DoubleType(), True),
-    ]
-)
+output_path = "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/location_dimension"
 
 raw_page_view_events_df = spark.read.option("mergeSchema", "true").schema(schema["page_view_events"]).parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp/raw_page_view_events")
 
@@ -46,13 +42,81 @@ final_location_dim_df = combined_df.withColumn(
         )
     ).cast("long"),
 )
+
+window_spec = Window.partitionBy("locationId").orderBy("city", "zip", "state", "lat", "lon")
+
+location_changes_df = final_location_dim_df.withColumn(
+    "prevCity", lag("city", 1).over(window_spec)
+).withColumn(
+    "prevZip", lag("zip", 1).over(window_spec)
+).withColumn(
+    "prevState", lag("state", 1).over(window_spec)
+).withColumn(
+    "prevLat", lag("lat", 1).over(window_spec)
+).withColumn(
+    "prevLon", lag("lon", 1).over(window_spec)
+).withColumn(
+    "isLocationChanged",
+    when(
+        (col("prevCity") != col("city")) |
+        (col("prevZip") != col("zip")) |
+        (col("prevState") != col("state")) |
+        (col("prevLat") != col("lat")) |
+        (col("prevLon") != col("lon")),
+        lit(1)
+    ).otherwise(lit(0))
+)
+
+activation_df = location_changes_df.withColumn(
+    "rowActivationDate",
+    when(col("isLocationChanged") == 1, current_timestamp()).otherwise(lit(None))
+)
+
+window_group_spec = Window.partitionBy("locationId").orderBy("rowActivationDate")
+
+final_location_dim_df = activation_df.withColumn(
+    "rowExpirationDate",
+    lead("rowActivationDate", 1).over(window_group_spec)
+).withColumn(
+    "rowExpirationDate",
+    when(col("rowExpirationDate").isNull(), lit(datetime(9999, 12, 31)))  
+    .otherwise(col("rowExpirationDate"))
+).withColumn(
+    "rowExpirationDate",  
+    col("rowExpirationDate").cast("timestamp")
+).withColumn(
+    "currRow",
+    when(col("rowExpirationDate") == lit(datetime(9999, 12, 31)), lit(1)).otherwise(lit(0))  
+)
+
 final_location_dim_df = final_location_dim_df.select(
-    "locationId", "city","zip", "state", "lat", "lon"
-).drop_duplicates(['locationId'])
+    "locationId",
+    "city",
+    "zip",
+    "state",
+    "lat",
+    "lon",
+    "rowActivationDate",
+    "rowExpirationDate",
+    "currRow"
+)
 
-final_location_dim_df.checkpoint()
+final_location_dim_df = final_location_dim_df.dropDuplicates(["locationId", "rowActivationDate"])
 
-output_path = "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/location_dimension"
-final_location_dim_df.write.mode("append").parquet(output_path)
+final_location_dim_df = final_location_dim_df.filter(col("currRow") == 1)
 
-# final_location_dim_df.show()
+
+if table_exists(output_path):
+    existing_location_dim_df = spark.read.parquet(output_path)
+
+    new_records_df = final_location_dim_df.join(existing_location_dim_df, on=["locationId"], how="left_anti")
+
+    new_records_df.checkpoint()
+
+    new_records_df.write.mode("append").parquet(output_path)
+
+else:
+    final_location_dim_df.checkpoint()
+    final_location_dim_df.write.mode("append").parquet(output_path)
+
+final_location_dim_df.printSchema()

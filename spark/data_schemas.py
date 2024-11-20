@@ -105,7 +105,8 @@ from pyspark.sql.types import (IntegerType,
                                StructField,
                                StructType,
                                LongType,
-                               BooleanType)
+                               BooleanType,
+                               TimestampType)
 
 schema = {
     'listen_events': StructType([
@@ -190,5 +191,97 @@ schema = {
          StructField("gender", StringType(), True),         
          StructField("registration", LongType(), True),       
      ]
-)
+),
+
+#DWH model schemas
+    'user_dim_schema': StructType([
+    StructField("userId", LongType(), False),
+    StructField("firstName", StringType(), True),
+    StructField("lastName", StringType(), True),
+    StructField("gender", StringType(), True),
+    StructField("level", StringType(), True),
+    StructField("registration", LongType(), True),
+    StructField("grouped", LongType(), True),
+    StructField("rowActivationDate", TimestampType(), True),
+    StructField("rowExpirationDate", TimestampType(), True),
+    StructField("currRow", IntegerType(), True)
+]),
+
+    'artist_dim_schema': StructType(
+    [
+        StructField("artistId", LongType(), True),  
+        StructField("artist", StringType(), True),  
+        StructField("lat", DoubleType(), True), 
+        StructField("lon", DoubleType(), True), 
+        StructField("city", StringType(), True),  
+        StructField("state", StringType(), True),  
+        StructField("rowActivationDate", TimestampType(), True),
+        StructField("rowExpirationDate", TimestampType(), True),
+        StructField("currRow", IntegerType(), False),  
+    ]
+),
+
+    'datetime_dim_schema': StructType([
+        StructField("datetimeId", LongType(), True),
+        StructField("timestamp", TimestampType(), True),
+        StructField("year", IntegerType(), True),
+        StructField("month", IntegerType(), True),
+        StructField("day", IntegerType(), True),
+        StructField("hour", IntegerType(), True),
+        StructField("minute", IntegerType(), True),
+        StructField("second", IntegerType(), True),
+        StructField("rowActivationDate", TimestampType(), True),
+        StructField("rowExpirationDate", TimestampType(), True),
+        StructField("currRow", IntegerType(), False),  
+]),
+
+    'location_dim_schema': StructType(
+    [
+        StructField("locationId", LongType(), True),
+        StructField("city", StringType(), True),
+        StructField("zip",  IntegerType(), True),
+        StructField("state", StringType(), True),
+        StructField("lon", DoubleType(), True),
+        StructField("lat", DoubleType(), True),
+        StructField("rowActivationDate", TimestampType(), True),
+        StructField("rowExpirationDate", TimestampType(), True),
+        StructField("currRow", IntegerType(), False), 
+    ]
+),
+
+    'song_dim_schema': StructType(
+    [
+        StructField("songId", LongType(), True),  
+        StructField("song", StringType(), True),  
+        StructField("artist", StringType(), True),  
+        StructField("duration", DoubleType(), True),  
+    ]
+),
+
+    'session_dim_schema': StructType( 
+    [
+        StructField("sessionId", LongType(), True), 
+        StructField("startTime", TimestampType(), True), 
+        StructField("endTime", TimestampType(), True), 
+        StructField("rowActivationDate", TimestampType(), True),
+        StructField("rowExpirationDate", TimestampType(), True),
+        StructField("currRow", IntegerType(), False), 
+    ]
+),
+
+    'fact_streams_schema': StructType([
+    StructField("userId", LongType(), True),
+    StructField("artistId", LongType(), True),
+    StructField("songId", LongType(), True),
+    StructField("locationId", LongType(), True),
+    StructField("datetimeId", LongType(), True),
+    StructField("sessionId", LongType(), True),
+    StructField("ts", TimestampType(), True),
+    StructField("streamCount", LongType(), True), 
+    StructField("is_song_skipped", LongType(), True), 
+    StructField("listeningTime", LongType(), True),  
+    StructField("distinctSessions", LongType(), True),
+    StructField("distinctSongsPlayed", LongType(), True),
+    StructField("totalListeningTime", LongType(), True)
+])
 }
