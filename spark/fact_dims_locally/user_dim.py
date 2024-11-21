@@ -4,7 +4,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, lead, lag, lit, when, rank, sum as _sum, first
+from pyspark.sql.functions import col, lead, lag, lit, when, rank, sum as _sum, first, from_unixtime
 from pyspark.sql.window import Window
 from datetime import datetime
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, TimestampType, LongType
@@ -27,13 +27,13 @@ output_path = "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_table
 listen_events_df = spark.read.option("mergeSchema", "true").schema(schema['listen_events']).parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp/raw_listen_events")
 
 user_base_df = listen_events_df.select(
-    col("userId").cast("bigint"),
+    col("userId").cast("long"),
     col("firstName"),
     col("lastName"),
     col("gender"),
     col("level"),
-    (col("ts") / 1000).cast("timestamp").alias("eventTimestamp"),
-    col("registration").cast("bigint")
+    from_unixtime(col("ts") / 1000).cast("timestamp").alias("eventTimestamp"),
+    col("registration").cast("long")
 )
 
 window_spec = Window.partitionBy("userId").orderBy("eventTimestamp")
