@@ -8,7 +8,7 @@ docker build -t streamsonic .
 echo "Running Eventsim in detached mode..."
 
 # timeout 600s 
-docker run -d \
+docker run -itd \
   --network host \
   --name million_events \
   streamsonic \
@@ -16,7 +16,7 @@ docker run -d \
   --start-time "2022-01-01T00:00:00" \
   --end-time "2022-12-31T23:59:59" \
   --nusers 100 \
-  --kafkaBrokerList 34.46.123.9:9092 \
+  --kafkaBrokerList localhost:9092 \
 
 echo "Started streaming events for users over the year 2022..."
 echo "Eventsim is running in detached mode."
