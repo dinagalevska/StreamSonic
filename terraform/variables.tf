@@ -23,7 +23,7 @@ variable "service_account_email" {
   description = "GCP Service Account"
 }
 
-variable "bucket_name" {
-  default     = "streamsonic_bucket"
-  description = "Name of the Google Cloud Storage bucket for data storage"
-}
+# variable "bucket_name" {
+#   default     = "streamsonic_bucket"
+#   description = "Name of the Google Cloud Storage bucket for data storage"
+# }
