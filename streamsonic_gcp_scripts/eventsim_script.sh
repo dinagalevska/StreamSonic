@@ -6,25 +6,19 @@ echo "Building Eventsim Image..."
 docker build -t streamsonic .
 
 echo "Running Eventsim in detached mode..."
-# Timeout set to 10 minutes (600 seconds)
-timeout 600s docker run -itd \
+
+# timeout 600s 
+docker run -d \
   --network host \
   --name million_events \
-  --memory="5.5g" \
-  --memory-swap="7g" \
-  --oom-kill-disable \
   streamsonic \
-    -c "examples/example-config.json" \
-    --start-time "$(date +"%Y-%m-%dT%H:%M:%S")" \
-    --end-time "$(date -d "+1 days" +"%Y-%m-%dT%H:%M:%S")" \
-    --nusers 1000000 \
-    --growth-rate 10 \
-    --userid 1 \
-    --kafkaBrokerList localhost:9092 \
-    --randomseed 1 \
-    # --continuous
+  -c "examples/example-config.json" \
+  --start-time "2022-01-01T00:00:00" \
+  --end-time "2022-12-31T23:59:59" \
+  --nusers 100 \
+  --kafkaBrokerList 34.46.123.9:9092 \
 
-echo "Started streaming events for 1 Million users..."
+echo "Started streaming events for users over the year 2022..."
 echo "Eventsim is running in detached mode."
 echo "Run 'docker logs --follow million_events' to see the logs."
 
