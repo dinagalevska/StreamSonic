@@ -32,7 +32,7 @@ resource "google_compute_firewall" "port_rules" {
 
 resource "google_compute_instance" "kafka_vm_instance" {
   name                      = "musicdata-streaming-pipeline-kafka-instance"
-  machine_type              = "e2-standard-4"
+  machine_type              = "e2-standard-2"
   zone                      = var.zone
   tags                      = ["kafka"]
   allow_stopping_for_update = true
