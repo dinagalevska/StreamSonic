@@ -30,6 +30,11 @@ resource "google_compute_firewall" "port_rules" {
   target_tags   = ["kafka"]
 }
 
+resource "google_compute_address" "kafka_static_ip" {
+  name   = "kafka-static-ip"
+  region = var.region
+}
+
 resource "google_compute_instance" "kafka_vm_instance" {
   name                      = "musicdata-streaming-pipeline-kafka-instance"
   machine_type              = "e2-standard-2"
@@ -47,6 +52,7 @@ resource "google_compute_instance" "kafka_vm_instance" {
   network_interface {
     network = "default"
     access_config {
+            nat_ip = google_compute_address.kafka_static_ip.address  
     }
   }
 
@@ -57,7 +63,7 @@ resource "google_compute_instance" "kafka_vm_instance" {
 }
 
 output "kafka_vm_ip" {
-  value = google_compute_instance.kafka_vm_instance.network_interface[0].access_config[0].nat_ip
+  value = google_compute_address.kafka_static_ip.address 
 }
 
 resource "google_cloud_run_v2_job" "default" {
@@ -83,7 +89,7 @@ resource "google_cloud_run_v2_job" "default" {
           "--start-time", "2021-01-01T00:00:00",
           "--end-time", "2021-12-01T00:00:00",
           "--nusers", "100",
-          "--kafkaBrokerList", "35.239.250.116:9092"
+          "--kafkaBrokerList", "${google_compute_address.kafka_static_ip.address}:9092"
         ]
       }
 
