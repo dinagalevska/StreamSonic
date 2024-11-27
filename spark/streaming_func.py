@@ -13,8 +13,8 @@ def string_decode(s, encoding='utf-8'):
     else:
         return s
 
-
-def create_or_get_spark_session(app_name, master="local[*]"):
+#local[*]
+def create_or_get_spark_session(app_name, master="yarn"):
     """
     Creates or gets a Spark Session
 
@@ -29,7 +29,7 @@ def create_or_get_spark_session(app_name, master="local[*]"):
     spark = SparkSession.builder \
         .appName(app_name) \
         .master(master) \
-        .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.2.0") \
+        .config(master=master) \
         .getOrCreate()
 
     return spark

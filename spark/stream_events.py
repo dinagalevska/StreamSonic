@@ -12,9 +12,9 @@ STATUS_CHANGE_TOPIC = "status_change_events"
 KAFKA_PORT = "9092"
 
 KAFKA_ADDRESS = os.getenv("KAFKA_ADDRESS", 'localhost')
-# GCP_GCS_BUCKET = os.getenv("GCP_GCS_BUCKET", 'streamify')
-# GCS_STORAGE_PATH = f'gs://{GCP_GCS_BUCKET}'
-GCS_STORAGE_PATH = os.getenv("LOCAL_STORAGE_PATH", "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp")
+GCP_GCS_BUCKET = os.getenv("GCP_GCS_BUCKET", 'streamify')
+GCS_STORAGE_PATH = f'gs://{GCP_GCS_BUCKET}'
+# GCS_STORAGE_PATH = os.getenv("LOCAL_STORAGE_PATH", "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp")
 
 spark = create_or_get_spark_session('Eventsim Stream')
 spark.streams.resetTerminated()
@@ -45,23 +45,23 @@ status_events = process_stream(
 
 
 listen_events_writer = create_file_write_stream(listen_events,
-                                                f"{GCS_STORAGE_PATH}/raw_{LISTEN_EVENTS_TOPIC}",
-                                                f"{GCS_STORAGE_PATH}/checkpoint/raw_{LISTEN_EVENTS_TOPIC}"
+                                                f"{GCS_STORAGE_PATH}/{LISTEN_EVENTS_TOPIC}",
+                                                f"{GCS_STORAGE_PATH}/checkpoint/{LISTEN_EVENTS_TOPIC}"
                                                 )
 
 page_view_events_writer = create_file_write_stream(page_view_events,
-                                                   f"{GCS_STORAGE_PATH}/raw_{PAGE_VIEW_EVENTS_TOPIC}",
-                                                   f"{GCS_STORAGE_PATH}/checkpoint/raw_{PAGE_VIEW_EVENTS_TOPIC}"
+                                                   f"{GCS_STORAGE_PATH}/{PAGE_VIEW_EVENTS_TOPIC}",
+                                                   f"{GCS_STORAGE_PATH}/checkpoint/{PAGE_VIEW_EVENTS_TOPIC}"
                                                    )
 
 auth_events_writer = create_file_write_stream(auth_events,
-                                              f"{GCS_STORAGE_PATH}/raw_{AUTH_EVENTS_TOPIC}",
-                                              f"{GCS_STORAGE_PATH}/checkpoint/raw_{AUTH_EVENTS_TOPIC}"
+                                              f"{GCS_STORAGE_PATH}/{AUTH_EVENTS_TOPIC}",
+                                              f"{GCS_STORAGE_PATH}/checkpoint/{AUTH_EVENTS_TOPIC}"
                                               )
 
 status_change_writer = create_file_write_stream(status_events,
-                                              f"{GCS_STORAGE_PATH}/raw_{STATUS_CHANGE_TOPIC}",
-                                              f"{GCS_STORAGE_PATH}/checkpoint/raw_{STATUS_CHANGE_TOPIC}"
+                                              f"{GCS_STORAGE_PATH}/{STATUS_CHANGE_TOPIC}",
+                                              f"{GCS_STORAGE_PATH}/checkpoint/{STATUS_CHANGE_TOPIC}"
                                               )
 
 
