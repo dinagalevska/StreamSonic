@@ -103,3 +103,84 @@ resource "google_cloud_run_v2_job" "default" {
     ]
   }
 }
+
+resource "google_storage_bucket" "streamsonic_bucket" {
+  name          = var.bucket_name
+  location      = var.region
+  force_destroy = true
+  storage_class = "STANDARD"
+
+  uniform_bucket_level_access = true
+
+  # versioning {
+  #   enabled = true
+  # }
+
+  lifecycle_rule {
+    action {
+      type = "Delete"
+    }
+    condition {
+      age = 30 # days
+    }
+  }
+}
+
+output "bucket_name" {
+  value       = google_storage_bucket.streamsonic_bucket.name
+  description = "Name of the Google Cloud Storage bucket created for data storage"
+}
+
+resource "google_dataproc_cluster" "mulitnode_spark_cluster" {
+  name   = "dataproc-cluster-musicdata-stream"
+  region = var.region
+
+  cluster_config {
+
+    staging_bucket = var.bucket_name
+
+    gce_cluster_config {
+      network = "default"
+      zone    = var.zone
+
+      shielded_instance_config {
+        enable_secure_boot = true
+      }
+    }
+
+    master_config {
+      num_instances = 1
+      machine_type  = "e2-standard-2"
+      disk_config {
+        boot_disk_type    = "pd-ssd"
+        boot_disk_size_gb = 30
+      }
+    }
+
+    worker_config {
+      num_instances = 2
+      machine_type  = "e2-medium"
+      disk_config {
+        boot_disk_size_gb = 30
+      }
+    }
+
+    software_config {
+      image_version = "2.0-debian10"
+      override_properties = {
+        "dataproc:dataproc.allow.zero.workers" = "true"
+      }
+      optional_components = ["JUPYTER"]
+    }
+  }
+}
+
+output "dataproc_cluster_name" {
+  value       = google_dataproc_cluster.mulitnode_spark_cluster.name
+  description = "Name of the Dataproc cluster for Spark processing"
+}
+
+output "dataproc_cluster_master_type" {
+  value       = google_dataproc_cluster.mulitnode_spark_cluster.cluster_config[0].master_config[0].machine_type
+  description = "Machine type of the Dataproc cluster master node"
+}
