@@ -114,7 +114,7 @@ schema = {
         StructField("song", StringType(), True),
         StructField("duration", DoubleType(), True),
         StructField("ts", LongType(), True),
-        StructField("sessionid", IntegerType(), True),
+        StructField("sessionId", IntegerType(), True),
         StructField("auth", StringType(), True),
         StructField("level", StringType(), True),
         StructField("itemInSession", IntegerType(), True),
