@@ -119,7 +119,7 @@ schema = {
         StructField("level", StringType(), True),
         StructField("itemInSession", IntegerType(), True),
         StructField("city", StringType(), True),
-        StructField("zip", IntegerType(), True),
+        StructField("zip", StringType(), True), 
         StructField("state", StringType(), True),
         StructField("userAgent", StringType(), True),
         StructField("lon", DoubleType(), True),
