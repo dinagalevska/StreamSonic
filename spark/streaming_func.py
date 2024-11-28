@@ -1,15 +1,16 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import from_json, col, month, hour, dayofmonth, year, udf
+from pyspark.sql.functions import from_json, col, month, hour, dayofmonth, col, year, udf
 
 
 @udf
 def string_decode(s, encoding='utf-8'):
     if s:
-        return (s.encode('latin1')        
-                .decode('unicode-escape') 
-                .encode('latin1')        
-                .decode(encoding)        
+        return (s.encode('latin1')         # To bytes, required by 'unicode-escape'
+                .decode('unicode-escape') # Perform the actual octal-escaping decode
+                .encode('latin1')         # 1:1 mapping back to bytes
+                .decode(encoding)         # Decode original encoding
                 .strip('\"'))
+
     else:
         return s
 
@@ -21,18 +22,17 @@ def create_or_get_spark_session(app_name, master="yarn"):
         app_name : str
             Pass the name of your app
         master : str
-            Choosing the Spark master, local is the default
+            Choosing the Spark master, yarn is the default
     Returns:
         spark: SparkSession
     """
-    spark = SparkSession.builder \
-        .appName(app_name) \
-        .master(master) \
-        .config(master=master) \
-        .getOrCreate()
+    spark = (SparkSession
+             .builder
+             .appName(app_name)
+             .master(master=master)
+             .getOrCreate())
 
     return spark
-
 
 
 def create_kafka_read_stream(spark, kafka_address, kafka_port, topic, starting_offset="earliest"):
@@ -55,7 +55,7 @@ def create_kafka_read_stream(spark, kafka_address, kafka_port, topic, starting_o
     read_stream = (spark
                    .readStream
                    .format("kafka")
-                   .option("kafka.bootstrap.servers", f"{kafka_address}:{kafka_port}")  # Parameterized
+                   .option("kafka.bootstrap.servers", f"{kafka_address}:{kafka_port}")
                    .option("failOnDataLoss", False)
                    .option("startingOffsets", starting_offset)
                    .option("subscribe", topic)
@@ -76,24 +76,38 @@ def process_stream(stream, stream_schema, topic):
         stream: DataStreamReader
     """
 
+    # read only value from the incoming message and convert the contents
+    # inside to the passed schema
     stream = (stream
-              .selectExpr("CAST(value AS STRING) AS value")
+              .selectExpr("CAST(value AS STRING)")
               .select(
-                  from_json(col("value"), stream_schema).alias("data")
+                  from_json(col("value"), stream_schema).alias(
+                      "data")
               )
               .select("data.*")
               )
 
-    if topic in ["listening_events_schema", "page_view_events_schema"]:
+    # Add month, day, hour to split the data into separate directories
+    stream = (stream
+              .withColumn("ts", (col("ts")/1000).cast("timestamp"))
+              .withColumn("year", year(col("ts")))
+              .withColumn("month", month(col("ts")))
+              .withColumn("hour", hour(col("ts")))
+              .withColumn("day", dayofmonth(col("ts")))
+              )
+
+    # rectify string encoding
+    if topic in ["listen_events", "page_view_events"]:
         stream = (stream
-                  .withColumn("song", string_decode("song"))
-                  .withColumn("artist", string_decode("artist"))
-                  )
+                .withColumn("song", string_decode("song"))
+                .withColumn("artist", string_decode("artist")) 
+                )
+
 
     return stream
 
 
-def create_file_write_stream(stream, storage_path, checkpoint_path, trigger="10 seconds", output_mode="append", file_format="parquet"):
+def create_file_write_stream(stream, storage_path, checkpoint_path, trigger="120 seconds", output_mode="append", file_format="parquet"):
     """
     Write the stream back to a file store
 
