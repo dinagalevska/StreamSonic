@@ -12,7 +12,7 @@ STATUS_CHANGE_TOPIC = "status_change_events"
 KAFKA_PORT = "9092"
 
 KAFKA_ADDRESS = os.getenv("KAFKA_ADDRESS", 'localhost')
-GCP_GCS_BUCKET = os.getenv("GCP_GCS_BUCKET", 'streamify')
+GCP_GCS_BUCKET = os.getenv("GCP_GCS_BUCKET", 'streamsonic_bucket')
 GCS_STORAGE_PATH = f'gs://{GCP_GCS_BUCKET}'
 # GCS_STORAGE_PATH = os.getenv("LOCAL_STORAGE_PATH", "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp")
 
