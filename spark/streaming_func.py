@@ -13,7 +13,6 @@ def string_decode(s, encoding='utf-8'):
     else:
         return s
 
-#local[*]
 def create_or_get_spark_session(app_name, master="yarn"):
     """
     Creates or gets a Spark Session
@@ -85,15 +84,6 @@ def process_stream(stream, stream_schema, topic):
               .select("data.*")
               )
 
-    # # Add month, day, hour to split the data into separate directories
-    # stream = (stream
-    #           .withColumn("ts", (col("ts") / 1000).cast("timestamp"))
-    #           .withColumn("year", year(col("ts")))
-    #           .withColumn("month", month(col("ts")))
-    #           .withColumn("hour", hour(col("ts")))
-    #           .withColumn("day", dayofmonth(col("ts")))
-    #           )
-
     if topic in ["listening_events_schema", "page_view_events_schema"]:
         stream = (stream
                   .withColumn("song", string_decode("song"))
@@ -125,7 +115,6 @@ def create_file_write_stream(stream, storage_path, checkpoint_path, trigger="10 
     write_stream = (stream
                     .writeStream
                     .format(file_format)
-                    # .partitionBy("month", "day", "hour")
                     .option("path", storage_path)
                     .option("checkpointLocation", checkpoint_path)
                     .trigger(processingTime=trigger)
