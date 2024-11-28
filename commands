@@ -2,3 +2,6 @@ vlez vo kafka vm export na kafka address
 gcloud run jobs execute data-generate-job --region=us-central1
 gcloud compute firewall-rules list --project=streamsonic-441414
 gcloud run jobs executions cancel data-generate-job-bslzk --region=us-central1
+spark-submit \
+--packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2 \
+stream_events.py
