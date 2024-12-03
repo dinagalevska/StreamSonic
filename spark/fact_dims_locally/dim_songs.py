@@ -24,9 +24,9 @@ spark.sparkContext.setCheckpointDir(checkpoint_dir)
 
 output_path = "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/song_dimension"
 
-raw_songs_df = spark.read.option("mergeSchema", "true").schema(schema["listen_events"]).parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp/raw_listen_events")
+listen_events_df = spark.read.option("mergeSchema", "true").schema(schema['listen_events']).parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp/correct_listen_events")
 
-song_data_df = raw_songs_df.select("song", "artist", "duration")
+song_data_df = listen_events_df.select("song", "artist", "duration", "ts")
 
 song_dim_df = song_data_df.withColumn(
     "songId",
@@ -39,45 +39,32 @@ song_dim_df = song_data_df.withColumn(
     ).cast("long")
 )
 
-song_dim_df = song_dim_df.select("songId", "artist", "song", "duration").drop_duplicates(['songId'])
+song_dim_df = song_dim_df.select("songId", "artist", "song", "duration", "ts").drop_duplicates(['songId'])
 
-window_spec = Window.partitionBy("songId").orderBy("song", "artist", "duration")
+window_spec = Window.partitionBy("songId").orderBy("ts")
 
-song_changes_df = song_dim_df.withColumn(
-    "prevArtist", lag("artist", 1).over(window_spec)
+final_song_df = song_dim_df.withColumn(
+    "rowActivationDate", col("ts")  
 ).withColumn(
-    "prevSong", lag("song", 1).over(window_spec)
+    "rowExpirationDate", lit(datetime(9999, 12, 31)) 
 ).withColumn(
-    "prevDuration", lag("duration", 1).over(window_spec)
-).withColumn(
-    "isSongChanged",
-    when(
-        (col("prevArtist") != col("artist")) |
-        (col("prevSong") != col("song")) |
-        (col("prevDuration") != col("duration")),
-        lit(1)
-    ).otherwise(lit(0))
-)
-
-activation_df = song_changes_df.withColumn(
-    "rowActivationDate",
-    when(col("isSongChanged") == 1, current_timestamp()).otherwise(lit(None))
+    "currRow", lit(1)  
 )
 
 window_group_spec = Window.partitionBy("songId").orderBy("rowActivationDate")
 
-final_song_df = activation_df.withColumn(
+final_song_df = final_song_df.withColumn(
     "rowExpirationDate",
-    lead("rowActivationDate", 1).over(window_group_spec)
-).withColumn(
-    "rowExpirationDate",
-    when(col("rowExpirationDate").isNull(), lit("9999-12-31")).otherwise(col("rowExpirationDate"))
-).withColumn(
-    "rowExpirationDate",
-    col("rowExpirationDate").cast("timestamp")
-).withColumn(
+    when(
+        lead("rowActivationDate", 1).over(window_group_spec).isNull(),
+        lit(datetime(9999, 12, 31))  
+    ).otherwise(lead("rowActivationDate", 1).over(window_group_spec)) 
+)
+
+final_song_df = final_song_df.withColumn(
     "currRow",
-    when(col("rowExpirationDate") == lit("9999-12-31"), lit(1)).otherwise(lit(0))
+    when(col("rowExpirationDate") == lit(datetime(9999, 12, 31)), lit(1)) 
+    .otherwise(lit(0))
 )
 
 final_song_df = final_song_df.select(
