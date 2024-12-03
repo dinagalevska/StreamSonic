@@ -23,21 +23,16 @@ spark.sparkContext.setCheckpointDir(checkpoint_dir)
 
 output_path = "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/session_dimension"
 
-auth_events_df = spark.read.option("mergeSchema", "true").schema(schema['auth_events']).parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp/raw_auth_events")
+auth_events_df = spark.read.option("mergeSchema", "true").schema(schema['auth_events']).parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp/correct_auth_events")
 
 dimsessions_df = auth_events_df.groupBy("sessionId").agg(
-    min(from_unixtime(col("ts") / 1000).cast("timestamp")).alias("startTime"),
-    max(from_unixtime(col("ts") / 1000).cast("timestamp")).alias("endTime")
+    min(col("ts")).cast("timestamp").alias("startTime"),
+    max(col("ts")).cast("timestamp").alias("endTime")
 ).select(
     col("sessionId"),
     col("startTime").cast("string"),
     col("endTime").cast("string")
-)
-
-dimsessions_df = dimsessions_df.withColumn(
-    "sessionHash",
-    hash(concat_ws("_", col("startTime"), col("endTime"))).cast("long")
-)
+).drop_duplicates(['sessionId'])
 
 window_spec = Window.partitionBy("sessionId").orderBy("startTime", "endTime")
 
@@ -56,7 +51,7 @@ session_changes_df = dimsessions_df.withColumn(
 
 activation_df = session_changes_df.withColumn(
     "rowActivationDate",
-    when(col("isSessionChanged") == 1, current_timestamp()).otherwise(lit(None))
+    when(col("isSessionChanged") == 1, col("startTime")).otherwise(col("startTime"))
 )
 
 window_group_spec = Window.partitionBy("sessionId").orderBy("rowActivationDate")

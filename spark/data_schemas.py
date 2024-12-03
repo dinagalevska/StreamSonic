@@ -131,7 +131,7 @@ schema = {
         StructField("registration", LongType(), True)
     ]),
     'page_view_events': StructType([
-        StructField("ts", LongType(), True),
+        StructField("ts", TimestampType(), True),
         StructField("sessionId", IntegerType(), True),
         StructField("page", StringType(), True),
         StructField("auth", StringType(), True),
@@ -155,7 +155,7 @@ schema = {
         StructField("duration", DoubleType(), True)
     ]),
     'auth_events': StructType([
-        StructField("ts", LongType(), True),
+        StructField("ts", TimestampType(), True),
         StructField("sessionId", IntegerType(), True),
         StructField("level", StringType(), True),
         StructField("itemInSession", IntegerType(), True),
@@ -174,7 +174,7 @@ schema = {
     ]),
     'status_change_events':StructType(
      [
-         StructField("ts", LongType(), True),                
+         StructField("ts", TimestampType(), True),                
          StructField("sessionId", LongType(), True),        
          StructField("auth", StringType(), True),            
          StructField("level", StringType(), True),           
