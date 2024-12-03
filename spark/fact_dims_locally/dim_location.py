@@ -24,69 +24,51 @@ spark.sparkContext.setCheckpointDir(checkpoint_dir)
 
 output_path = "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/location_dimension"
 
-raw_page_view_events_df = spark.read.option("mergeSchema", "true").schema(schema["page_view_events"]).parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp/raw_page_view_events")
+raw_page_view_events_df = spark.read.option("mergeSchema", "true").schema(schema["page_view_events"]).parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp/correct_page_view_events")
 
-combined_df = raw_page_view_events_df.select("city","zip", "state", "lat", "lon")
-
+combined_df = raw_page_view_events_df.select("city", "zip", "state", "lon", "lat", "ts")
 
 final_location_dim_df = combined_df.withColumn(
     "locationId",
     hash(
         concat_ws(
             "_",
-            col("city").cast("string"),
-            col("zip").cast("string"),
-            col("state").cast("string"),
-            col("lon").cast("string"),
-            col("lat").cast("string"),
+            coalesce(col("city"), lit("Unknown")),
+            coalesce(col("zip"), lit("Unknown")),
+            coalesce(col("state"), lit("Unknown")),
+            coalesce(col("lon"), lit("0")),
+            coalesce(col("lat"), lit("0")),
         )
     ).cast("long"),
 )
 
-window_spec = Window.partitionBy("locationId").orderBy("city", "zip", "state", "lat", "lon")
+final_location_dim_df =  final_location_dim_df.select('locationId', "city", "zip", "state", "lon", "lat", "ts").drop_duplicates(['locationId'])
+
+window_spec = Window.partitionBy("locationId").orderBy("ts")
 
 location_changes_df = final_location_dim_df.withColumn(
-    "prevCity", lag("city", 1).over(window_spec)
+    "rowActivationDate", col("ts")  
 ).withColumn(
-    "prevZip", lag("zip", 1).over(window_spec)
+    "rowExpirationDate", lit(datetime(9999, 12, 31)) 
 ).withColumn(
-    "prevState", lag("state", 1).over(window_spec)
-).withColumn(
-    "prevLat", lag("lat", 1).over(window_spec)
-).withColumn(
-    "prevLon", lag("lon", 1).over(window_spec)
-).withColumn(
-    "isLocationChanged",
-    when(
-        (col("prevCity") != col("city")) |
-        (col("prevZip") != col("zip")) |
-        (col("prevState") != col("state")) |
-        (col("prevLat") != col("lat")) |
-        (col("prevLon") != col("lon")),
-        lit(1)
-    ).otherwise(lit(0))
-)
-
-activation_df = location_changes_df.withColumn(
-    "rowActivationDate",
-    when(col("isLocationChanged") == 1, current_timestamp()).otherwise(lit(None))
+    "currRow", lit(1)  
 )
 
 window_group_spec = Window.partitionBy("locationId").orderBy("rowActivationDate")
 
+
+activation_df = location_changes_df.withColumn(
+    "rowExpirationDate",
+    when(
+        lead("rowActivationDate", 1).over(window_group_spec).isNull(),
+        lit(datetime(9999, 12, 31))  
+    ).otherwise(lead("rowActivationDate", 1).over(window_group_spec)) 
+)
+
 final_location_dim_df = activation_df.withColumn(
-    "rowExpirationDate",
-    lead("rowActivationDate", 1).over(window_group_spec)
-).withColumn(
-    "rowExpirationDate",
-    when(col("rowExpirationDate").isNull(), lit(datetime(9999, 12, 31)))  
-    .otherwise(col("rowExpirationDate"))
-).withColumn(
-    "rowExpirationDate",  
-    col("rowExpirationDate").cast("timestamp")
-).withColumn(
     "currRow",
-    when(col("rowExpirationDate") == lit(datetime(9999, 12, 31)), lit(1)).otherwise(lit(0))  
+    when(col("rowExpirationDate") == lit(datetime(9999, 12, 31)), lit(1)) 
+    .otherwise(lit(0))
 )
 
 final_location_dim_df = final_location_dim_df.select(
@@ -94,8 +76,8 @@ final_location_dim_df = final_location_dim_df.select(
     "city",
     "zip",
     "state",
-    "lat",
     "lon",
+    "lat",
     "rowActivationDate",
     "rowExpirationDate",
     "currRow"
