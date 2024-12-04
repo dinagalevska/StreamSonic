@@ -23,7 +23,9 @@ spark.sparkContext.setCheckpointDir(checkpoint_dir)
 
 output_path = "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/session_dimension"
 
-auth_events_df = spark.read.option("mergeSchema", "true").schema(schema['auth_events']).parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp/correct_auth_events")
+# auth_events_df = spark.read.option("mergeSchema", "true").schema(schema['auth_events']).parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp/correct_auth_events")
+
+auth_events_df =  spark.read.option("mergeSchema", "true").schema(schema['listen_events']).parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp/correct_listen_events")
 
 dimsessions_df = auth_events_df.groupBy("sessionId").agg(
     min(col("ts")).cast("timestamp").alias("startTime"),

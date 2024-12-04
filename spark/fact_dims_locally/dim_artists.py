@@ -23,10 +23,9 @@ spark.sparkContext.setCheckpointDir(checkpoint_dir)
 
 output_path = "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/dim_artist"
 
-raw_listen_events_df = spark.read.option("mergeSchema", "true").schema(schema["listen_events"]).parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp/raw_listen_events")
+raw_listen_events_df = spark.read.option("mergeSchema", "true").schema(schema["listen_events"]).parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp/correct_listen_events")
 
-artist_data_df = raw_listen_events_df.select("artist", "lat", "lon", "city", "state", "ts", from_unixtime(col("ts") / 1000).cast("timestamp").alias("eventTimestamp")) \
-                                    
+artist_data_df = raw_listen_events_df.select("artist", "lat", "lon", "city", "state", "ts")                      
 
 final_artist_dim_df = artist_data_df.withColumn(
     "artistId",
@@ -42,6 +41,9 @@ final_artist_dim_df = artist_data_df.withColumn(
     ).cast("long")
 )
 
+final_artist_dim_df = final_artist_dim_df.select('artistId', "artist", "lat", "lon", "city", "state", "ts") \
+    .drop_duplicates(['artistId'])
+
 final_artist_dim_df = final_artist_dim_df.withColumn(
     "rowActivationDate", col("ts")
 ).withColumn(
@@ -51,20 +53,20 @@ final_artist_dim_df = final_artist_dim_df.withColumn(
 )
 
 window_spec = Window.partitionBy("artistId").orderBy("rowActivationDate")
-window_group_spec = Window.partitionBy("artistId").orderBy("rowActivationDate")
 
-final_artist_dim_df = final_artist_dim_df.withColumn(
-    "rowExpirationDate",
-    lead("rowActivationDate", 1).over(window_group_spec)
-).withColumn(
-    "rowExpirationDate",
-    when(col("rowExpirationDate").isNull(),  lit(253402300800000).cast("long"))  
-    .otherwise(col("rowExpirationDate"))
-).withColumn(
-    "currRow",
-    when(col("rowExpirationDate") ==  lit(253402300800000).cast("long"), lit(1)) 
-    .otherwise(lit(0))
-)
+final_artist_dim_df = final_artist_dim_df \
+    .withColumn(
+        "rowExpirationDate",
+        when(
+            lead("rowActivationDate", 1).over(window_spec).isNull(),
+            lit(datetime(9999, 12, 31))
+        ).otherwise(lead("rowActivationDate", 1).over(window_spec))
+    ) \
+    .withColumn(
+        "currRow",
+        when(col("rowExpirationDate") == lit(datetime(9999, 12, 31)), lit(1))
+        .otherwise(lit(0))
+    )
 
 final_artist_dim_df = final_artist_dim_df.dropDuplicates(["artistId", "rowActivationDate"]).filter(col("currRow") == 1)
 
