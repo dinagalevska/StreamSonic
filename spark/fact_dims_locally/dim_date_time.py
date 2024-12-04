@@ -6,11 +6,13 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col, concat_ws, hash, year, month, dayofmonth,
-    hour, minute, second, from_unixtime, when, first, sum, lag, lit, lead
+    hour, minute, second, from_unixtime, when, first, sum, dayofweek, lit, lead, unix_timestamp
 )
 from pyspark.sql.window import Window
 from datetime import datetime
-from pyspark.sql.types import StructType, StructField, LongType, StringType, IntegerType, TimestampType
+
+from data_schemas import schema
+
 
 def table_exists(path: str) -> bool:
     return os.path.exists(path)
@@ -25,68 +27,75 @@ spark.sparkContext.setCheckpointDir(checkpoint_dir)
 
 output_path = "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/datetime_dimension"
 
-raw_events_df = spark.read.option("mergeSchema", "true").parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp/raw_page_view_events")
+raw_events_df = spark.read.option("mergeSchema", "true").schema(schema["page_view_events"]).parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp/correct_page_view_events")
 
-datetime_data_df = raw_events_df.select("ts") \
-    .dropDuplicates(["ts"]) \
-    .withColumn("timestamp", from_unixtime(col("ts") / 1000).cast("timestamp")) \
-    .withColumn("year", year("timestamp")) \
-    .withColumn("month", month("timestamp")) \
-    .withColumn("day", dayofmonth("timestamp")) \
-    .withColumn("hour", hour("timestamp")) \
-    .withColumn("minute", minute("timestamp")) \
-    .withColumn("second", second("timestamp")) \
+datetime_data_df = raw_events_df.select("ts")
+
+datetime_data_df = datetime_data_df \
+    .withColumn("year", year("ts")) \
+    .withColumn("month", month("ts")) \
+    .withColumn("day", dayofmonth("ts")) \
+    .withColumn("hour", hour("ts")) \
+    .withColumn("minute", minute("ts")) \
+    .withColumn("second", second("ts")) \
+    .withColumn("datetimeId", hash(concat_ws("_", col("ts").cast("string"))).cast("long")) \
     .withColumn(
-        "datetimeId",
-        hash(
-            concat_ws(
-                "_",
-                col("year").cast("string"),
-                col("month").cast("string"),
-                col("day").cast("string"),
-                col("hour").cast("string"),
-                col("minute").cast("string"),
-                col("second").cast("string")
-            )
-        ).cast("long")
+        "weekendFlag",
+        when(dayofweek("ts").isin(6, 7), lit(True)).otherwise(lit(False))
     )
+    # .withColumn(
+    #     "datetimeId",
+    #     hash(
+    #         concat_ws(
+    #             "_",
+    #             col("ts").cast("string")
+    #         )
+    #     ).cast("long")
+    
+datetime_data_df = datetime_data_df.select('ts', 'year', 'month', 'day', 'hour', 'minute', 'second', 'datetimeId', 'weekendFlag') \
+    .drop_duplicates(['datetimeId'])
 
-
-window_spec = Window.partitionBy("datetimeId").orderBy("timestamp")
+window_spec = Window.partitionBy("datetimeId").orderBy("ts")
 
 datetime_changes_df = datetime_data_df.withColumn(
-    "prevTimestamp", lag("timestamp", 1).over(window_spec)
+    "rowActivationDate", col("ts")  
 ).withColumn(
-    "isTimestampChanged",
-    when(col("prevTimestamp").isNull(), lit(1)) 
-    .when(col("prevTimestamp") != col("timestamp"), lit(1))  
-    .otherwise(lit(0))
-)
-
-grouped_df = datetime_changes_df.withColumn(
-    "grouped", sum("isTimestampChanged").over(window_spec)
-)
-
-activation_df = grouped_df.groupBy(
-    "datetimeId", "timestamp", "year", "month", "day", "hour", "minute", "second"
-).agg(
-    first("timestamp").alias("rowActivationDate") 
+    "rowExpirationDate", lit(datetime(9999, 12, 31)) 
+).withColumn(
+    "currRow", lit(1)  
 )
 
 window_group_spec = Window.partitionBy("datetimeId").orderBy("rowActivationDate")
 
-final_datetime_dim_df = activation_df.withColumn(
+
+final_datetime_dim_df = datetime_changes_df.withColumn(
     "rowExpirationDate",
-    lead("rowActivationDate", 1).over(window_group_spec)
-).withColumn(
-    "rowExpirationDate",
-    when(col("rowExpirationDate").isNull(), lit(datetime(9999, 12, 31)))  
-    .otherwise(col("rowExpirationDate"))
-).withColumn(
-    "currRow",
-    when(col("rowExpirationDate") == lit(datetime(9999, 12, 31)), lit(1)).otherwise(lit(0))  
+    when(
+        lead("rowActivationDate", 1).over(window_group_spec).isNull(),
+        lit(datetime(9999, 12, 31))  
+    ).otherwise(lead("rowActivationDate", 1).over(window_group_spec)) 
 )
 
+
+final_datetime_dim_df = final_datetime_dim_df.withColumn(
+    "currRow",
+    when(col("rowExpirationDate") == lit(datetime(9999, 12, 31)), lit(1)) 
+    .otherwise(lit(0))
+)
+final_datetime_dim_df = final_datetime_dim_df.select(
+    'datetimeId',
+    'ts',
+    'year', 
+    'month', 
+    'day', 
+    'hour', 
+    'minute', 
+    'second',
+    'weekendFlag',
+    'rowActivationDate',
+    'rowExpirationDate',
+    'currRow'
+)
 final_datetime_dim_df = final_datetime_dim_df.dropDuplicates(["datetimeId", "rowActivationDate"])
 
 final_datetime_dim_df = final_datetime_dim_df.filter(col("currRow") == 1)

@@ -236,6 +236,7 @@ schema = {
         StructField("hour", IntegerType(), True),
         StructField("minute", IntegerType(), True),
         StructField("second", IntegerType(), True),
+        StructField("weekendFlag", StringType(), True),
         StructField("rowActivationDate", TimestampType(), True),
         StructField("rowExpirationDate", TimestampType(), True),
         StructField("currRow", IntegerType(), False),  
