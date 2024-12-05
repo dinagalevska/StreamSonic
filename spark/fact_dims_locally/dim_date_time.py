@@ -40,19 +40,23 @@ datetime_data_df = datetime_data_df \
     .withColumn("hour", hour("ts")) \
     .withColumn("minute", minute("ts")) \
     .withColumn("second", second("ts")) \
-    .withColumn("datetimeId", hash(concat_ws("_", col("ts").cast("string"))).cast("long")) \
     .withColumn(
         "weekendFlag",
         when(dayofweek("ts").isin(6, 7), lit(True)).otherwise(lit(False))
-    )
-    # .withColumn(
-    #     "datetimeId",
-    #     hash(
-    #         concat_ws(
-    #             "_",
-    #             col("ts").cast("string")
-    #         )
-    #     ).cast("long")
+    ) \
+    .withColumn(
+        "datetimeId",
+        hash(
+            concat_ws(
+                "_",
+                col("year").cast("string"),
+                col("month").cast("string"),
+                col("day").cast("string"),
+                col("hour").cast("string"),
+                col("minute").cast("string"),
+                col("second").cast("string"),
+            )
+        ).cast("long"))
     
 datetime_data_df = datetime_data_df.select('ts', 'year', 'month', 'day', 'hour', 'minute', 'second', 'datetimeId', 'weekendFlag') \
     .drop_duplicates(['datetimeId'])
