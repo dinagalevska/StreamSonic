@@ -20,7 +20,7 @@ spark = SparkSession.builder \
     .master("local[*]") \
     .getOrCreate()
 
-checkpoint_dir = "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/checkpoints/fact_streams_2/"
+checkpoint_dir = "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/checkpoints/fact_streams_2_datetime/"
 spark.sparkContext.setCheckpointDir(checkpoint_dir)
 
 listen_events_df = spark.read.option("mergeSchema", "true").schema(schema["listen_events"]).parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/tmp/correct_listen_events")
@@ -29,10 +29,10 @@ dim_users_df = spark.read.parquet("/mnt/c/Users/Dina Galevska/streamSonic/Stream
 dim_artists_df = spark.read.parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/dim_artist") 
 dim_songs_df = spark.read.parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/song_dimension") 
 dim_location_df = spark.read.parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/location_dimension")  
-dim_datetime_df = spark.read.parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/datetime_dimension")  
+dim_datetime_df = spark.read.parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/datetime_dimension_with_time")  
 dim_sessions_df = spark.read.parquet("/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/session_dimension")
 
-output_path = "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/fact_streams_2"
+output_path = "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/dim_fact_tables_locally/fact_streams_2_datetime"
 
 user_window = Window.partitionBy("userId").orderBy("ts")
 
@@ -76,19 +76,6 @@ listen_events_df = listen_events_df.withColumn(
 .withColumn("minute", minute(col("ts"))) \
 .withColumn("second", second(col("ts"))) \
 .withColumn(
-        "DateKey",
-        hash(
-            concat_ws(
-                "_",
-                col("year").cast("string"),
-                col("month").cast("string"),
-                col("day").cast("string"),
-                col("hour").cast("string"),
-                col("minute").cast("string"),
-                col("second").cast("string"),
-            )
-        ).cast("long")
-).withColumn(
     "streamCount", F.lit(1)
 ).withColumn(
     "isSongSkipped", 
@@ -96,12 +83,10 @@ listen_events_df = listen_events_df.withColumn(
 ).withColumn(
     "isMoving",
     F.when(
-        (F.lag(F.col("lat")).over(user_window).isNull()) | 
-        (F.lag(F.col("lon")).over(user_window).isNull()) | 
-        (F.lag(F.col("lat")).over(user_window) != F.col("lat")) |
-        (F.lag(F.col("lon")).over(user_window) != F.col("lon")),
-        1
-    ).otherwise(0)
+        (F.lag(F.col("lat")).over(user_window) == col("lat"))
+        | (F.lag(F.col("lon")).over(user_window) == col("lon")),
+        0,
+        ).otherwise(1),
 ).withColumn(
     "isFirstListenEvent",
     F.when(F.lag(F.col("ts")).over(user_window).isNull(), 1).otherwise(0)
@@ -116,32 +101,32 @@ listen_events_df = listen_events_df.withColumn(
 fact_streams_df = (
     listen_events_df.alias("listen_events")
     .join(
-        broadcast(dim_users_df.alias("dim_users")),
-        (col("listen_events.userId") == col("dim_users.userId")), 
-        how="left"  
+        broadcast(dim_users_df.filter(col("currRow") == 1).alias("dim_users")),
+        (col("listen_events.userId") == col("dim_users.userId")),
+        how="left"
     )
     .join(
-        dim_artists_df.alias("dim_artists"),
+        dim_artists_df.filter(col("currRow") == 1).alias("dim_artists"),
         (col("listen_events.ArtistKey") == col("dim_artists.artistId")),
         how="left"
     )
     .join(
-        dim_songs_df.alias("dim_songs"),
+        dim_songs_df.filter(col("currRow") == 1).alias("dim_songs"),
         (col("listen_events.SongKey") == col("dim_songs.songId")),
         how="left"
     )
     .join(
-        dim_location_df.alias("dim_location"),
+        dim_location_df.filter(col("currRow") == 1).alias("dim_location"),
         (col("listen_events.LocationKey") == col("dim_location.locationId")),
         how="left"
     )
     .join(
-        dim_datetime_df.alias("dim_datetime"),
-        (col("listen_events.DateKey") == col("dim_datetime.datetimeId")),
+        dim_datetime_df.alias("dim_datetime"),  # No filter for currRow
+        (F.date_trunc('hour', col("listen_events.ts")) == col("dim_datetime.datetime")),
         how="left"
     )
     .join(
-        dim_sessions_df.alias("dim_sessions"),
+        dim_sessions_df.filter(col("currRow") == 1).alias("dim_sessions"),
         (col("listen_events.sessionId") == col("dim_sessions.sessionId")),
         how="left"
     )
@@ -149,10 +134,11 @@ fact_streams_df = (
         col("dim_users.userId").alias("UserKey"),
         col("dim_artists.artistId").alias("ArtistKey"),
         col("dim_songs.songId").alias("SongKey"),
-        col("dim_datetime.datetimeId").alias("DateKey"),
+        col('listen_events.duration').cast('double'),
+        col("dim_datetime.datetime").alias("DateKey"),
         col("dim_location.locationId").alias("LocationKey"),
         col("dim_sessions.sessionId").alias("SessionKey"),
-        col("listen_events.ts").alias("Timestamp"), 
+        col("listen_events.ts").alias("Timestamp"),
         col("listen_events.streamCount"),
         col("listen_events.isSongSkipped"),
         col("listen_events.isMoving"),
@@ -165,9 +151,10 @@ fact_streams_df = (
         col("listen_events.day"),
         col("listen_events.hour"),
         col("listen_events.minute"),
-        col("listen_events.second")
+        col("listen_events.second"),
     )
 )
+
 
 window_spec = Window.partitionBy("UserKey", "ArtistKey", "SongKey", "LocationKey", "DateKey").orderBy("Timestamp")
 
@@ -184,9 +171,9 @@ fact_streams_df = fact_streams_df.withColumn(
     when(col("rowExpirationDate") == lit(datetime(9999, 12, 31)), lit(1)).otherwise(lit(0))
 )
 
-# fact_streams_df = fact_streams_df.dropDuplicates(["UserKey", "ArtistKey", "SongKey", "LocationKey", "DateKey", "Timestamp", "rowActivationDate"])
+# fact_streams_df = fact_streams_df.orderBy('Timestamp', ascending=False)
 
-fact_streams_df = fact_streams_df.filter(col("currRow") == 1)
+fact_streams_df = fact_streams_df.dropDuplicates(['UserKey', 'ArtistKey', 'SongKey', 'SessionKey', 'DateKey', 'Timestamp'])
 
 fact_streams_df.checkpoint()
 if table_exists(output_path):
