@@ -5,3 +5,4 @@ gcloud run jobs executions cancel data-generate-job-bslzk --region=us-central1
 spark-submit \
 --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2 \
 stream_events.py
+.withColumn("ts", (col("ts").cast("long") / 1000).cast("timestamp"))
