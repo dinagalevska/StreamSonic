@@ -189,3 +189,27 @@ resource "google_bigquery_dataset" "streamsonic_dataset" {
   dataset_id = "streamsonic_dataset"
   project    = var.project_id
 }
+
+resource "google_compute_instance" "airflow_vm_instance" {
+  name                      = "streamify-airflow-instance"
+  machine_type              = "e2-standard-4"
+  allow_stopping_for_update = true
+
+  boot_disk {
+    initialize_params {
+      image = "ubuntu-os-cloud/ubuntu-2004-lts"
+      size  = 30
+    } 
+  }
+
+  network_interface {
+    network = "default"
+    access_config {
+    }
+  }
+}
+
+output "airflow_vm_external_ip" {
+  value = google_compute_instance.airflow_vm_instance.network_interface[0].access_config[0].nat_ip
+}
+
