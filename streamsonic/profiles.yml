@@ -1,0 +1,13 @@
+streamsonic:
+  outputs:
+    dev:
+      dataset: streamsonic_dataset  
+      keyfile: "/mnt/c/Users/Dina Galevska/streamSonic/StreamSonic/keys/streamsonic-441414-1c56c1f4d03c.json"  
+      location: us-central1 
+      method: service-account 
+      priority: interactive 
+      project: "streamsonic-441414"
+      threads: 4 
+      timeout_seconds: 300 
+      type: bigquery 
+  target: dev  
