@@ -3,7 +3,6 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, expr
 from datetime import datetime
 
-# Initialize Spark session
 APP_NAME = os.getenv("APP_NAME", "DateTime Dimension")
 TEMP_GCS_BUCKET = os.getenv("TEMP_GCS_BUCKET", "streamsonic_bucket")
 
@@ -17,15 +16,12 @@ spark = (
     .getOrCreate()
 )
 
-# Define start and end dates as timestamps
 startdate = datetime.strptime("2020-01-01 00:00:00", "%Y-%m-%d %H:%M:%S")
 enddate = datetime.strptime("2024-12-31 23:59:59", "%Y-%m-%d %H:%M:%S")
 
-# Generate a range of timestamps (by hour) using Spark SQL sequence function
 df_ref_datetime = spark.range(int((enddate - startdate).total_seconds() / 3600) + 1) \
     .selectExpr(f"CAST({int(startdate.timestamp())} + id * 3600 AS TIMESTAMP) as datetime")
 
-# Define column transformations for DateTime Dimension
 column_rules = [
     ("DateSK", "cast(date_format(datetime, 'yyyyMMdd') as int)"),
     ("Year", "year(datetime)"),
@@ -54,15 +50,12 @@ column_rules = [
     ("Second", "second(datetime)"),
 ]
 
-# Apply all column transformations
 for new_column_name, expression in column_rules:
     df_ref_datetime = df_ref_datetime.withColumn(new_column_name, expr(expression))
 
-# Define the output path for BigQuery and checkpoint directory
 output_path = "gs://streamsonic_bucket/output/datetime_dimension"
 checkpoint_dir = "gs://streamsonic_bucket/checkpoints/datetime_dimension_checkpoint/"
 
-# Write the data to BigQuery in batch mode with checkpoint
 df_ref_datetime.write \
     .format("bigquery") \
     .option("table", "streamsonic-441414:streamsonic_dataset.dim_datetime") \

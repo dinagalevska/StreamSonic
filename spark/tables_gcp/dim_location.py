@@ -9,7 +9,7 @@ from pyspark.sql.types import StructType, StructField, StringType, DoubleType, L
 def table_exists(path: str) -> bool:
     return os.path.exists(path)
 
-APP_NAME = os.getenv("APP_NAME", "Dim Artist Batch Processing")
+APP_NAME = os.getenv("APP_NAME", "Dim Location Batch Processing")
 TEMP_GCS_BUCKET = os.getenv("TEMP_GCS_BUCKET", "streamsonic_bucket")
 
 spark = (
@@ -22,16 +22,16 @@ spark = (
     .getOrCreate()
 )
 
-output_path = "gs://streamsonic_bucket/output/dim_artist_batch"
+output_path = "gs://streamsonic_bucket/output/dim_location_batch"
 
-checkpoint_dir = "gs://streamsonic_bucket/checkpoints/dim_artists/"
+checkpoint_dir = "gs://streamsonic_bucket/checkpoints/dim_location/"
 
 schema = StructType([
-    StructField("artist", StringType(), True),
+    StructField("city", StringType(), True),
+    StructField("zip", StringType(), True),
+    StructField("state", StringType(), True),
     StructField("lat", DoubleType(), True),
     StructField("lon", DoubleType(), True),
-    StructField("city", StringType(), True),
-    StructField("state", StringType(), True),
     StructField("ts", TimestampType(), True),
 ])
 
@@ -39,38 +39,38 @@ raw_listen_events_df = spark.read \
     .schema(schema) \
     .parquet("gs://streamsonic_bucket/listen_events/")
 
-artist_data_df = raw_listen_events_df.select("artist", "lat", "lon", "city", "state", "ts")
+location_data_df = raw_listen_events_df.select("city", "zip", "state", "lat", "lon", "ts")
 
-final_artist_dim_df = artist_data_df.withColumn(
-    "artistId",
+final_location_dim_df = location_data_df.withColumn(
+    "locationId",
     hash(
         concat_ws(
             "_", 
-            col("artist").cast("string"),
-            col("lat").cast("string"),
-            col("lon").cast("string"),
             col("city").cast("string"),
-            col("state").cast("string")
+            col("zip").cast("string"),
+            col("state").cast("string"),
+            col("lat").cast("string"),
+            col("lon").cast("string")
         )
     ).cast("long")
 )
 
-final_artist_dim_df = final_artist_dim_df.select('artistId', "artist", "lat", "lon", "city", "state", "ts") \
-    .drop_duplicates(['artistId'])
+final_location_dim_df = final_location_dim_df.select('locationId', "city", "zip", "state", "lat", "lon", "ts") \
+    .drop_duplicates(['locationId'])
 
-final_artist_dim_df = final_artist_dim_df.withColumn(
+final_location_dim_df = final_location_dim_df.withColumn(
     "rowActivationDate", col("ts")
 ).withColumn(
-    "rowExpirationDate", lit(None).cast("long")  
+    "rowExpirationDate", lit(None).cast("long") 
 ).withColumn(
     "currRow", lit(1)
 )
 
-window_spec = Window.partitionBy("artistId").orderBy("rowActivationDate")
+window_spec = Window.partitionBy("locationId").orderBy("rowActivationDate")
 
 max_timestamp_epoch = unix_timestamp(lit("9999-12-31 00:00:00"), "yyyy-MM-dd HH:mm:ss").cast("long")
 
-final_artist_dim_df = final_artist_dim_df \
+final_location_dim_df = final_location_dim_df \
     .withColumn(
         "rowExpirationDate",
         when(
@@ -84,12 +84,12 @@ final_artist_dim_df = final_artist_dim_df \
         .otherwise(lit(0))
     )
 
-final_artist_dim_df = final_artist_dim_df.dropDuplicates(["artistId", "rowActivationDate"]).filter(col("currRow") == 1)
+final_location_dim_df = final_location_dim_df.dropDuplicates(["locationId", "rowActivationDate"]).filter(col("currRow") == 1)
 
-final_artist_dim_df.write \
+final_location_dim_df.write \
     .format("bigquery") \
     .option("checkpointLocation", checkpoint_dir) \
-    .option("table", "streamsonic-441414:streamsonic_dataset.dim_artist") \
+    .option("table", "streamsonic-441414:streamsonic_dataset.dim_location") \
     .mode("append") \
     .save()
 
