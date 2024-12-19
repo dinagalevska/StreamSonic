@@ -6,4 +6,4 @@ spark-submit \
 --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.1.2 \
 stream_events.py
 .withColumn("ts", (col("ts").cast("long") / 1000).cast("timestamp"))
-gcloud dataproc jobs submit pyspark dim_artist.py     --cluster=dataproc-cluster-musicdata-stream     --region=us-central1     --jars gs://spark-lib/bigquery/spark-3.1-bigquery-0.41.0.jar     --properties spark.jars=gs://spark-lib/bigquery/spark-3.1-bigquery-0.41.0.jar
+gcloud dataproc jobs submit pyspark script    --cluster=dataproc-cluster-musicdata-stream     --region=us-central1     --jars gs://spark-lib/bigquery/spark-3.1-bigquery-0.41.0.jar     --properties spark.jars=gs://spark-lib/bigquery/spark-3.1-bigquery-0.41.0.jar
