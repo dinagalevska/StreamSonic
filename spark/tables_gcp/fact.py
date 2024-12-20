@@ -96,6 +96,9 @@ listen_events_df = listen_events_df.withColumn(
             col("artist")
         )
     ).cast("long")
+).withColumn(
+    "DateKey",
+    F.date_trunc('hour', col("ts"))
 ).withColumn("year", year(col("ts"))) \
 .withColumn("month", month(col("ts"))) \
 .withColumn("day", dayofmonth(col("ts"))) \
@@ -150,7 +153,7 @@ fact_streams_df = (
     )
     .join(
         dim_datetime_df.alias("dim_datetime"),
-        F.date_trunc('hour', col("listen_events.ts")) == col("dim_datetime.datetime"),
+        col("listen_events.DateKey") == col("dim_datetime.datetime"),
         how="left"
     )
     .join(
