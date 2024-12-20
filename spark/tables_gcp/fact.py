@@ -1,7 +1,7 @@
 import sys
 import os
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, lit, when, unix_timestamp, broadcast, lag, lead, concat_ws, dayofmonth, month, year, hour, minute, second, hash, coalesce
+from pyspark.sql.functions import col, lpad, lit, when, unix_timestamp, broadcast, lag, lead, concat_ws, dayofmonth, month, year, hour, minute, second, hash, coalesce
 from pyspark.sql.window import Window
 from pyspark.sql.types import StructType, StructField, StringType, LongType, TimestampType, DoubleType, IntegerType
 from datetime import datetime
@@ -96,9 +96,6 @@ listen_events_df = listen_events_df.withColumn(
             col("artist")
         )
     ).cast("long")
-).withColumn(
-    "DateKey",
-    F.date_trunc('hour', col("ts"))
 ).withColumn("year", year(col("ts"))) \
 .withColumn("month", month(col("ts"))) \
 .withColumn("day", dayofmonth(col("ts"))) \
@@ -106,6 +103,16 @@ listen_events_df = listen_events_df.withColumn(
 .withColumn("minute", minute(col("ts"))) \
 .withColumn("second", second(col("ts"))) \
 .withColumn("streamCount", lit(1)) \
+.withColumn(
+    "DateKey",
+    concat_ws(
+        "",
+        col("year"),
+        lpad(col("month"), 2, "0"),
+        lpad(col("day"), 2, "0"),
+        lpad(col("hour"), 2, "0")
+    )
+) \
 .withColumn(
     "isSongSkipped", 
     when(col("duration").cast("double") < lit(30), 1).otherwise(0)

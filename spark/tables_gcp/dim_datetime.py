@@ -23,7 +23,6 @@ df_ref_datetime = spark.range(int((enddate - startdate).total_seconds() / 3600) 
     .selectExpr(f"CAST({int(startdate.timestamp())} + id * 3600 AS TIMESTAMP) as datetime")
 
 column_rules = [
-    ("DateSK", "cast(date_format(datetime, 'yyyyMMdd') as int)"),
     ("Year", "year(datetime)"),
     ("Quarter", "quarter(datetime)"),
     ("Month", "month(datetime)"),
@@ -52,6 +51,11 @@ column_rules = [
 
 for new_column_name, expression in column_rules:
     df_ref_datetime = df_ref_datetime.withColumn(new_column_name, expr(expression))
+
+df_ref_datetime = df_ref_datetime.withColumn(
+    "DateKey",
+    ((col("Year") * 1000000 + col("Month") * 10000 + col("Day") * 100 + col("Hour")).cast("long"))
+)
 
 output_path = "gs://streamsonic_bucket/output/datetime_dimension"
 checkpoint_dir = "gs://streamsonic_bucket/checkpoints/datetime_dimension_checkpoint/"
